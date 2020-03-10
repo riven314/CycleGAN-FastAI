@@ -13,10 +13,10 @@ def test_checkmnist_dir():
 
 
 def test_extract_mnist():
-    train_data, test_data = extract_mnist(data_dir)
-    return train_data, test_data
+    images, labels = extract_mnist(data_dir)
+    return images, labels
 
 
 if __name__ == '__main__':
     test_checkmnist_dir()
-    train_data, test_data = test_extract_mnist()
+    images, labels = test_extract_mnist()

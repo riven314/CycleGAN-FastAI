@@ -1,16 +1,43 @@
-import subprocess
+"""
+to be done:
+1. support scale, rotation of digit (affine transformation)
+
+reference
+1. doing affine transform with PIL: https://stackoverflow.com/questions/17056209/python-pil-affine-transformation
+"""
 import os
 import os.path as osp
+import argparse
+import subprocess
+
 import numpy as np
 from imageio import imwrite
-import argparse
+
+from data_utils.downloads import check_mnist_dir, extract_mnist
 
 
-def sample_coordinate(high, size):
+def sample_coordinate(high, sample_n):
     if high > 0:
-        return np.random.randint(high, size=size)
+        return np.random.randint(high, size = sample_n)
     else:
-        return np.zeros(size).astype(np.int)
+        return np.zeros(sample_n).astype(np.int)
+
+
+def simulate_an_image():
+    """
+    subdivide a simulated image into 4 sqaure regions 
+    each region either contains nothing or an affine transformed MNIST 
+    each transform takes region's center as origin
+    resized to target image size at the end
+
+    :input:
+        digits_dict : dict, {digit index: np.array (# samples, W, H, 1)}
+        digit_cls_ls : list, class of digit to be shown: [top left, top right, bottom left, bottom right]
+                             suppose to be digit index, if None means NO digit in region, 
+        digit_tfms_ls : list of affine transformation configuration
+        image_size : list, [H, W], resized simulated image into image_size at last
+    """
+    pass
 
 
 def generator(config):
@@ -23,15 +50,17 @@ def generator(config):
     # split: train, val, test
     rs = np.random.RandomState(config.random_seed)
     num_original_class = len(np.unique(label))
-    num_class = len(np.unique(label))**config.num_digit
+    # no. of combination = digit_class_n ** num_digit
+    num_class = len(np.unique(label)) ** config.num_digit
     classes = list(np.array(range(num_class)))
     rs.shuffle(classes)
     num_train, num_val, num_test = [
             int(float(ratio)/np.sum(config.train_val_test_ratio)*num_class)
-            for ratio in config.train_val_test_ratio]
-    train_classes = classes[:num_train]
-    val_classes = classes[num_train:num_train+num_val]
-    test_classes = classes[num_train+num_val:]
+            for ratio in config.train_val_test_ratio
+            ]
+    train_classes = classes[ :num_train]
+    val_classes = classes[num_train :num_train + num_val]
+    test_classes = classes[num_train+num_val :]
 
     # label index
     indexes = []
@@ -39,7 +68,7 @@ def generator(config):
         indexes.append(list(np.where(label == c)[0]))
 
     # generate images for every class
-    assert config.image_size[1]//config.num_digit >= w
+    assert config.image_size[1]//config.num_digit >= w # not necessary constraint
     np.random.seed(config.random_seed)
 
     if not os.path.exists(config.multimnist_path):
@@ -49,14 +78,13 @@ def generator(config):
     count = 1
     for i, split_name in enumerate(['train', 'val', 'test']):
         path = osp.join(config.multimnist_path, split_name)
-        print('Generat images for {} at {}'.format(split_name, path))
+        print(f'generat images for {split_name} at {path}')
         if not os.path.exists(path):
             os.makedirs(path)
         for j, current_class in enumerate(split_classes[i]):
-            class_str = str(current_class)
-            class_str = '0'*(config.num_digit-len(class_str))+class_str
+            class_str = f'{current_class:02}'
             class_path = osp.join(path, class_str)
-            print('{} (progress: {}/{})'.format(class_path, count, len(classes)))
+            print(f'{class_path} (progress: {count}/{len(classes)})')
             if not os.path.exists(class_path):
                 os.makedirs(class_path)
             for k in range(config.num_image_per_class):
@@ -65,39 +93,33 @@ def generator(config):
                 imgs = [np.squeeze(image[np.random.choice(indexes[d])]) for d in digits]
                 background = np.zeros((config.image_size)).astype(np.uint8)
                 # sample coordinates
-                ys = sample_coordinate(config.image_size[0]-h, config.num_digit)
-                xs = sample_coordinate(config.image_size[1]//config.num_digit-w,
-                                       size=config.num_digit)
-                xs = [l*config.image_size[1]//config.num_digit+xs[l]
-                      for l in range(config.num_digit)]
+                ys = sample_coordinate(config.image_size[0] - h, config.num_digit)
+                xs = sample_coordinate(config.image_size[1] // config.num_digit - w, config.num_digit)
+                xs = [l * config.image_size[1] // config.num_digit + xs[l] for l in range(config.num_digit)]
                 # combine images
                 for i in range(config.num_digit):
-                    background[ys[i]:ys[i]+h, xs[i]:xs[i]+w] = imgs[i]
+                    background[ys[i]: ys[i] + h, xs[i]: xs[i] + w] = imgs[i]
                 # write the image
-                image_path = osp.join(class_path, '{}_{}.png'.format(k, class_str))
+                image_path = osp.join(class_path, f'{k}_{class_str}.png')
                 # image_path = osp.join(config.multimnist_path, '{}_{}_{}.png'.format(split_name, k, class_str))
                 imwrite(image_path, background)
             count += 1
-
     return image, label, indexes
 
 
 def argparser():
-    def str2bool(v):
-        return v.lower() == 'true'
-
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--mnist_path', type=str, default='./datasets/mnist/',
-                        help='path to *.gz files')
-    parser.add_argument('--multimnist_path', type=str, default='./datasets/multimnist')
-    parser.add_argument('--num_digit', type=int, default=2)
-    parser.add_argument('--train_val_test_ratio', type=int, nargs='+',
-                        default=[64, 16, 20], help='percentage')
+    parser.add_argument('--mnist_path', type = str, default = './datasets/mnist/',
+                        help = 'path to *.gz files')
+    parser.add_argument('--multimnist_path', type = str, default = './datasets/multimnist')
+    parser.add_argument('--num_digit', type = int, default = 2)
+    parser.add_argument('--train_val_test_ratio', type = int, nargs = '+',
+                        default=[64, 16, 20], help = 'express in percentage e.g. 10% --> 10')
     parser.add_argument('--image_size', type=int, nargs='+',
-                        default=[64, 64])
-    parser.add_argument('--num_image_per_class', type=int, default=10000)
-    parser.add_argument('--random_seed', type=int, default=123)
+                        default=[64, 64], help = 'size of simulated images (H, W)') 
+    parser.add_argument('--num_image_per_class', type = int, default = 10000)
+    parser.add_argument('--random_seed', type = int, default = 123)
     config = parser.parse_args()
     return config
 

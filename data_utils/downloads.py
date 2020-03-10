@@ -44,6 +44,11 @@ def unzip_file(src_path, tgt_path):
 
 
 def extract_mnist(data_dir):
+    """
+    :return:
+        images : np.array (70000, 28, 28, 1)
+        labels : np.array (70000, )
+    """
     train_n = 60000
     test_n = 10000
     train_image = load_np_objs(data_dir, 'train-images-idx3-ubyte', n = train_n, np_type = 'image')
