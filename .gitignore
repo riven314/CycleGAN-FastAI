@@ -1,4 +1,7 @@
 /horse2zebra
 /data
+/data_utils/__pycache__
+/unit_test/__pycache__
+/ipynb/.ipynb_checkpoints
 /ref/.ipynb_checkpoints
 /ref/__pycache__

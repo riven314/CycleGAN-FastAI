@@ -3,8 +3,12 @@ As a proof-of-concept, test if CycleGAN can learn spatial variation from images 
 
 
 ### Procedures
-1. prepare two sets of data (domain X and Y) with multi-digit MNIST simulator. They are different in spatial semantics
-2. train CycleGAN on the two sets of data. Experiment if CycleGAN can learn to translate between domain X and Y.
+1. prepare two sets of data (domain X and Y) with multi-digit MNIST simulator. They are different in spatial semantics 
+2. train CycleGAN on the two sets of data. Experiment if CycleGAN can learn to translate between domain X and Y
+
+
+### Remarks
+1. prepare several sets of domain X and Y, with varying difficulties
 
 
 ### Reference
