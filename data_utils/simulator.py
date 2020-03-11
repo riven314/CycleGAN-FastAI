@@ -1,9 +1,6 @@
 """
 to be done:
 1. support scale, rotation of digit (affine transformation)
-
-reference
-1. doing affine transform with PIL: https://stackoverflow.com/questions/17056209/python-pil-affine-transformation
 """
 import os
 import os.path as osp
