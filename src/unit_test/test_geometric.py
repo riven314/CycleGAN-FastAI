@@ -1,8 +1,8 @@
 import os
 import numpy as np
 
-from data_utils.geometric import *
-from data_utils.downloads import extract_mnist
+from src.data_utils.geometric import *
+from src.data_utils.downloads import extract_mnist
 
 data_dir = os.path.join('data')
 images, labels = extract_mnist(data_dir)

@@ -11,8 +11,8 @@ import random
 import numpy as np
 from PIL import Image
 
-from data_utils.geometric import apply_affine_transform, np_to_im, im_to_np
-from data_utils.downloads import extract_mnist
+from src.data_utils.geometric import apply_affine_transform, np_to_im, im_to_np
+from src.data_utils.downloads import extract_mnist
 
 
 class MultiDigitSimulator:
@@ -20,7 +20,7 @@ class MultiDigitSimulator:
         """
         :param:
             data_dir : str, dir to numpy MNIST digit data
-            is_exists : list of 4 bool, if digit exist in region
+            is_exists : list of 4 value, True or None
             affine_tfms : list of 4 dict, {
                 's': float, 'deg_ccw': float, 'dx': int, 'dy': int
                 }
@@ -29,30 +29,32 @@ class MultiDigitSimulator:
         (top left, top right, bottom left, bottom right)
         """
         self.images, self.labels = self.read_np_data(data_dir)
-        self.sample_n, _, self.w, self.h = self.images.shape
+        self.sample_n, self.w, self.h, _ = self.images.shape
         self.cls_n = self.labels[-1]
         self.is_exists = is_exists
         self.affine_tfms = affine_tfms
         self.write_dir = write_dir
         self.sanity_check()
 
-    def simulate(self, n):
+    def simulate_n_img(self, n):
         for i in range(n):
             sim_im = self.simulate_one_im()
             fname = f'simulated_{i:05}.jpg'
-            self.write_dir(sim_im, fname)
+            self.write_im(sim_im, fname)
         print('simulation completed!')
 
     def simulate_one_im(self):
         sub_im_ls = []
         digit_ls = self.sample_digits()
+        print(f'digit_ls: {digit_ls}')
         for digit, tfms in zip(digit_ls, self.affine_tfms):
-            if digit is None:
-                continue
-            sub_im = self.sample_one_digit_im(digit = digit)
-            sub_trans_im = apply_affine_transform(
-                sub_im, tfms['s'], tfms['deg_ccw'], tfms['dx'], tfms['dy']
-                )
+            if digit is False:
+                sub_trans_im = Image.new('L', (self.w, self.h))
+            else:
+                sub_im = self.sample_one_digit_im(digit = digit)
+                sub_trans_im = apply_affine_transform(
+                    sub_im, tfms['s'], tfms['deg_ccw'], tfms['dx'], tfms['dy']
+                    )
             sub_im_ls.append(sub_trans_im)
         sim_im = Image.new('L', (self.w * 2, self.h * 2))
         # top left, top right, btm left, btm right
@@ -66,7 +68,7 @@ class MultiDigitSimulator:
         """ sample digit number for self.is_exists[i] = True """
         digit_ls = []
         for i in self.is_exists:
-            digit = i if i is None else random.randint(0, self.cls_n - 1)
+            digit = i if i is False else random.randint(0, self.cls_n - 1)
             digit_ls.append(digit)
         return digit_ls
 
@@ -92,6 +94,7 @@ class MultiDigitSimulator:
 
     def sanity_check(self):
         assert os.path.isdir(self.write_dir), f'write dir not exist: {self.write_dir}'
+        assert self.w == self.h, f'self.w ({self.w}) not match with self.h ({self.h})'
         for digit, tfms in zip(self.is_exists, self.affine_tfms):
-            assert (digit is None) == (tfms is None), 'is_exists not aligned with affine_tfms'
+            assert (digit is False) == (tfms is None), 'is_exists not aligned with affine_tfms'
         

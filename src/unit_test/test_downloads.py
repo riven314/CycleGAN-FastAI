@@ -4,7 +4,7 @@ reference:
 """
 import os
 
-from data_utils.downloads import *
+from src.data_utils.downloads import *
 
 data_dir = os.path.join('data')
 

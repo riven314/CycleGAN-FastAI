@@ -10,6 +10,8 @@ import math
 
 
 def np_to_im(np_im):
+    if len(np_im.shape) == 3:
+        np_im = np.squeeze(np_im)
     return Image.fromarray(np_im, mode = 'L')
 
 
