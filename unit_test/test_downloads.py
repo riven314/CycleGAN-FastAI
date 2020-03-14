@@ -8,6 +8,7 @@ from data_utils.downloads import *
 
 data_dir = os.path.join('data')
 
+
 def test_checkmnist_dir():
     check_mnist_dir(data_dir)
 

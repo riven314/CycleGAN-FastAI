@@ -1,4 +1,6 @@
 """
+helper function for applying affine transform on one MNIST digit
+
 reference
 1. doing affine transform with PIL: https://stackoverflow.com/questions/17056209/python-pil-affine-transformation
 """

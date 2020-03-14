@@ -1,133 +1,97 @@
 """
-to be done:
-1. support scale, rotation of digit (affine transformation)
+simulate a scene with multi MNIST digit
+subdivide a scene by 4 regions (top left, top right, bottom left, bottom right)
+each region has the following parameters:
+1. if MNIST digit is present in the region
+2. if present, specify affine transform parameters to be applied on it
 """
 import os
-import os.path as osp
-import argparse
-import subprocess
+import random
 
 import numpy as np
-from imageio import imwrite
+from PIL import Image
 
-from data_utils.downloads import check_mnist_dir, extract_mnist
-
-
-def sample_coordinate(high, sample_n):
-    if high > 0:
-        return np.random.randint(high, size = sample_n)
-    else:
-        return np.zeros(sample_n).astype(np.int)
+from data_utils.geometric import apply_affine_transform, np_to_im, im_to_np
+from data_utils.downloads import extract_mnist
 
 
-def simulate_an_image():
-    """
-    subdivide a simulated image into 4 sqaure regions 
-    each region either contains nothing or an affine transformed MNIST 
-    each transform takes region's center as origin
-    resized to target image size at the end
+class MultiDigitSimulator:
+    def __init__(self, data_dir, is_exists, affine_tfms, write_dir):
+        """
+        :param:
+            data_dir : str, dir to numpy MNIST digit data
+            is_exists : list of 4 bool, if digit exist in region
+            affine_tfms : list of 4 dict, {
+                's': float, 'deg_ccw': float, 'dx': int, 'dy': int
+                }
+        
+        * both is_exists, affine_tfms is in order: 
+        (top left, top right, bottom left, bottom right)
+        """
+        self.images, self.labels = self.read_np_data(data_dir)
+        self.sample_n, _, self.w, self.h = self.images.shape
+        self.cls_n = self.labels[-1]
+        self.is_exists = is_exists
+        self.affine_tfms = affine_tfms
+        self.write_dir = write_dir
+        self.sanity_check()
 
-    :input:
-        digits_dict : dict, {digit index: np.array (# samples, W, H, 1)}
-        digit_cls_ls : list, class of digit to be shown: [top left, top right, bottom left, bottom right]
-                             suppose to be digit index, if None means NO digit in region, 
-        digit_tfms_ls : list of affine transformation configuration
-        image_size : list, [H, W], resized simulated image into image_size at last
-    """
-    pass
+    def simulate(self, n):
+        for i in range(n):
+            sim_im = self.simulate_one_im()
+            fname = f'simulated_{i:05}.jpg'
+            self.write_dir(sim_im, fname)
+        print('simulation completed!')
 
+    def simulate_one_im(self):
+        sub_im_ls = []
+        digit_ls = self.sample_digits()
+        for digit, tfms in zip(digit_ls, self.affine_tfms):
+            if digit is None:
+                continue
+            sub_im = self.sample_one_digit_im(digit = digit)
+            sub_trans_im = apply_affine_transform(
+                sub_im, tfms['s'], tfms['deg_ccw'], tfms['dx'], tfms['dy']
+                )
+            sub_im_ls.append(sub_trans_im)
+        sim_im = Image.new('L', (self.w * 2, self.h * 2))
+        # top left, top right, btm left, btm right
+        sim_im.paste(sub_im_ls[0], (0, 0)) 
+        sim_im.paste(sub_im_ls[1], (self.w, 0))
+        sim_im.paste(sub_im_ls[2], (0, self.h))
+        sim_im.paste(sub_im_ls[3], (self.w, self.h))
+        return sim_im
 
-def generator(config):
-    # check if mnist is downloaded. if not, download it
-    check_mnist_dir(config.mnist_path)
-    # extract mnist images and labels
-    image, label = extract_mnist(config.mnist_path)
-    h, w = image.shape[1:3]
+    def sample_digits(self):
+        """ sample digit number for self.is_exists[i] = True """
+        digit_ls = []
+        for i in self.is_exists:
+            digit = i if i is None else random.randint(0, self.cls_n - 1)
+            digit_ls.append(digit)
+        return digit_ls
 
-    # split: train, val, test
-    rs = np.random.RandomState(config.random_seed)
-    num_original_class = len(np.unique(label))
-    # no. of combination = digit_class_n ** num_digit
-    num_class = len(np.unique(label)) ** config.num_digit
-    classes = list(np.array(range(num_class)))
-    rs.shuffle(classes)
-    num_train, num_val, num_test = [
-            int(float(ratio)/np.sum(config.train_val_test_ratio)*num_class)
-            for ratio in config.train_val_test_ratio
-            ]
-    train_classes = classes[ :num_train]
-    val_classes = classes[num_train :num_train + num_val]
-    test_classes = classes[num_train+num_val :]
+    def sample_one_digit_im(self, digit = None):
+        """ randomly sample a MNIST digit, unconditional sample if digit = None """
+        if digit is None:
+            idx = random.randint(0, self.sample_n - 1)
+        else:
+            assert isinstance(digit, int) and digit <= self.labels.max(), f'wrong arg digit {digit}'
+            digit_idxs = np.where(self.labels == digit)[0]
+            idx = np.random.choice(digit_idxs, 1)[0]
+        np_sample = self.images[idx]
+        return np_to_im(np_sample)
 
-    # label index
-    indexes = []
-    for c in range(num_original_class):
-        indexes.append(list(np.where(label == c)[0]))
+    def read_np_data(self, data_dir):
+        images, labels = extract_mnist(data_dir)
+        return images, labels
 
-    # generate images for every class
-    assert config.image_size[1]//config.num_digit >= w # not necessary constraint
-    np.random.seed(config.random_seed)
+    def write_im(self, im, fname):
+        w_path = os.path.join(self.write_dir, fname)
+        im.save(w_path)
+        print(f'image simulated: {w_path}')
 
-    if not os.path.exists(config.multimnist_path):
-        os.makedirs(config.multimnist_path)
-
-    split_classes = [train_classes, val_classes, test_classes]
-    count = 1
-    for i, split_name in enumerate(['train', 'val', 'test']):
-        path = osp.join(config.multimnist_path, split_name)
-        print(f'generat images for {split_name} at {path}')
-        if not os.path.exists(path):
-            os.makedirs(path)
-        for j, current_class in enumerate(split_classes[i]):
-            class_str = f'{current_class:02}'
-            class_path = osp.join(path, class_str)
-            print(f'{class_path} (progress: {count}/{len(classes)})')
-            if not os.path.exists(class_path):
-                os.makedirs(class_path)
-            for k in range(config.num_image_per_class):
-                # sample images
-                digits = [int(class_str[l]) for l in range(config.num_digit)]
-                imgs = [np.squeeze(image[np.random.choice(indexes[d])]) for d in digits]
-                background = np.zeros((config.image_size)).astype(np.uint8)
-                # sample coordinates
-                ys = sample_coordinate(config.image_size[0] - h, config.num_digit)
-                xs = sample_coordinate(config.image_size[1] // config.num_digit - w, config.num_digit)
-                xs = [l * config.image_size[1] // config.num_digit + xs[l] for l in range(config.num_digit)]
-                # combine images
-                for i in range(config.num_digit):
-                    background[ys[i]: ys[i] + h, xs[i]: xs[i] + w] = imgs[i]
-                # write the image
-                image_path = osp.join(class_path, f'{k}_{class_str}.png')
-                # image_path = osp.join(config.multimnist_path, '{}_{}_{}.png'.format(split_name, k, class_str))
-                imwrite(image_path, background)
-            count += 1
-    return image, label, indexes
-
-
-def argparser():
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--mnist_path', type = str, default = './datasets/mnist/',
-                        help = 'path to *.gz files')
-    parser.add_argument('--multimnist_path', type = str, default = './datasets/multimnist')
-    parser.add_argument('--num_digit', type = int, default = 2)
-    parser.add_argument('--train_val_test_ratio', type = int, nargs = '+',
-                        default=[64, 16, 20], help = 'express in percentage e.g. 10% --> 10')
-    parser.add_argument('--image_size', type=int, nargs='+',
-                        default=[64, 64], help = 'size of simulated images (H, W)') 
-    parser.add_argument('--num_image_per_class', type = int, default = 10000)
-    parser.add_argument('--random_seed', type = int, default = 123)
-    config = parser.parse_args()
-    return config
-
-
-def main():
-    config = argparser()
-    assert len(config.train_val_test_ratio) == 3
-    assert sum(config.train_val_test_ratio) == 100
-    assert len(config.image_size) == 2
-    generator(config)
-
-
-if __name__ == '__main__':
-    main()
+    def sanity_check(self):
+        assert os.path.isdir(self.write_dir), f'write dir not exist: {self.write_dir}'
+        for digit, tfms in zip(self.is_exists, self.affine_tfms):
+            assert (digit is None) == (tfms is None), 'is_exists not aligned with affine_tfms'
+        
