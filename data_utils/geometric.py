@@ -15,6 +15,26 @@ def im_to_np(im):
     return np.array(im.convert('L'), dtype = np.uint8)
 
 
+def apply_affine_transform(im, s, deg_ccw, dx, dy):
+    """
+    apply in order: (i) scaling, (ii) rotation, (iii) translation
+
+    :param:
+        im : PIL.Image instance
+        s : float, enlarge/ shrink (>1 / <1)
+        deg_ccw : float, rotation in degree, counter closewise, applied on im
+        dx : int, pixel wise transaltion on left, right (+ve/ -ve)
+        dy : int, pixel wise translation on up, down (+ve/ -ve)
+
+    :output:
+        trans_im : PIL.Image, image after affine transform, resized to same size as input
+    """
+    trans_im = apply_scale_on_im(im, s)
+    trans_im = apply_rotate_on_im(trans_im, deg_ccw)
+    trans_im = apply_translate_on_im(trans_im, dx, dy)
+    return trans_im
+
+
 def apply_scale_on_im(im, s):
     """
     apply scaling on im, assume same scale applied on both x, y axis
@@ -29,8 +49,8 @@ def apply_scale_on_im(im, s):
     # pad image if shrink 
     if s < 1:
         new_w, new_h = int(w / s), int(h / s)
-        new_im = Image.new("L", (new_w, new_h))
-        new_im.paste(im, ((new_w - w) // 2, (new_h - h) // 2))
+        trans_im = Image.new("L", (new_w, new_h))
+        trans_im.paste(im, ((new_w - w) // 2, (new_h - h) // 2))
     # crop image on center if enlarge
     elif s > 1:
         # left, upper, right, and lower
@@ -39,17 +59,16 @@ def apply_scale_on_im(im, s):
         right = left + new_w
         top = (h - new_h) // 2
         bottom = top + new_h
-        new_im = im.crop((left, top, right, bottom))
+        trans_im = im.crop((left, top, right, bottom))
     else:
-        new_im = im
-    return new_im.resize(size = (w, h), resample = Image.BILINEAR)
+        trans_im = im
+    return trans_im.resize(size = (w, h), resample = Image.BILINEAR)
 
 
 def apply_translate_on_im(im, dx, dy):
     """
     :param:
         im : PIL.Image instance
-        s : float, scale applied on im, in both x and y
         dx : int, pixel wise transaltion on left, right (+ve/ -ve)
         dy : int, pixel wise translation on up, down (+ve/ -ve)
     :output:
