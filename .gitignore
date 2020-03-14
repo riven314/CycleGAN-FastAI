@@ -1,5 +1,6 @@
 /horse2zebra
-/data
+/data/*
+!/data/test
 /*/__pycache__
 /*/.ipynb_checkpoints
 /*/*/__pycache__
