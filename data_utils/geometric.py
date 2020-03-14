@@ -15,22 +15,61 @@ def im_to_np(im):
     return np.array(im.convert('L'), dtype = np.uint8)
 
 
-def apply_affine_on_im(im, s, dx, dy, deg_ccw):
+def apply_scale_on_im(im, s):
     """
-    apply affine transform on input image im
-    specified by the following paramters 
+    apply scaling on im, assume same scale applied on both x, y axis
 
     :param:
         im : PIL.Image instance
+        s : float, enlarge/ shrink (>1 / <1)
+    :output:
+        trans_im : PIL.Image, image after affine transform, resized to same size as input
+    """
+    w, h = im.size
+    # pad image if shrink 
+    if s < 1:
+        new_w, new_h = int(w / s), int(h / s)
+        new_im = Image.new("L", (new_w, new_h))
+        new_im.paste(im, ((new_w - w) // 2, (new_h - h) // 2))
+    # crop image on center if enlarge
+    elif s > 1:
+        # left, upper, right, and lower
+        new_w, new_h = w / s, h / s
+        left = (w - new_w) // 2
+        right = left + new_w
+        top = (h - new_h) // 2
+        bottom = top + new_h
+        new_im = im.crop((left, top, right, bottom))
+    else:
+        new_im = im
+    return new_im.resize(size = (w, h), resample = Image.BILINEAR)
+
+
+def apply_translate_on_im(im, dx, dy):
+    """
+    :param:
+        im : PIL.Image instance
         s : float, scale applied on im, in both x and y
-        dx : int, pixel wise transaltion in x direction applied on im (+ve, shift right)
-        dy : int, pixel wise translation in y direction applied on im (+ve, shift down)
+        dx : int, pixel wise transaltion on left, right (+ve/ -ve)
+        dy : int, pixel wise translation on up, down (+ve/ -ve)
+    :output:
+        trans_im : PIL.Image, image after affine transform, resized to same size as input
+    """
+    return im.transform(im.size, Image.AFFINE, (1, 0, dx, 0, 1, dy))
+
+
+def apply_rotate_on_im(im, deg_ccw):
+    """
+    apply rotation on image center (i.e. origin at w/2, h/2)
+
+    :param:
+        im : PIL.Image instance
         deg_ccw : float, rotation in degree, counter closewise, applied on im
     :output:
         trans_im : PIL.Image, image after affine transform, resized to same size as input
     """
     # define each geometric param
-    sx = sy = 1 / s
+    sx = sy = 1.
     w, h = im.size
     angle = math.radians(-deg_ccw)
     cos_theta = math.cos(angle)
@@ -42,9 +81,6 @@ def apply_affine_on_im(im, s, dx, dy, deg_ccw):
     cy = h / 2.
     tx = new_w / 2.
     ty = new_h / 2.
-    # apply adjustment on top of centered image
-    tx += dx
-    ty += dy
 
     # calc entries of trans matrix
     a = cos_theta / sx
