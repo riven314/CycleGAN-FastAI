@@ -3,9 +3,7 @@ from fastai.vision import *
 
 class ImageTuple(ItemBase):
     def __init__(self, img1, img2):
-        # img1, img2 = fastai.vision.image.Imagae
         self.img1,self.img2 = img1,img2
-        # img.data is [0 - 1] tensor, converted to [-0.5 - 0.5]
         self.obj,self.data = (img1,img2),[-1+2*img1.data,-1+2*img2.data]
     
     def apply_tfms(self, tfms, **kwargs):
@@ -13,16 +11,15 @@ class ImageTuple(ItemBase):
         self.img2 = self.img2.apply_tfms(tfms, **kwargs)
         return self
     
-    def to_one(self): 
-        return Image(0.5+torch.cat(self.data,2)/2)
+    def to_one(self): return Image(0.5+torch.cat(self.data,2)/2)
 
-
+    
 class TargetTupleList(ItemList):
     def reconstruct(self, t:Tensor): 
         if len(t.size()) == 0: return t
         return ImageTuple(Image(t[0]/2+0.5),Image(t[1]/2+0.5))
 
-    
+
 class ImageTupleList(ImageList):
     _label_cls=TargetTupleList
     def __init__(self, items, itemsB=None, **kwargs):

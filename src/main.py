@@ -16,12 +16,12 @@ from src.model_utils.loss import *
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', type = str, help = 'dir to training data (contain trainA, trainB etc.)')
-    parser.add_argument('--lr', type = float, help = 'learning rate')
-    parser.add_argument('--bs', type = int, help = 'batch size for training')
+    parser.add_argument('--lr', type = float, default = 3e-4, help = 'learning rate')
+    parser.add_argument('--bs', type = int, default = 64, help = 'batch size for training')
     parser.add_argument('--n_epoch', type = int, default = 100, help = 'no. epochs for training')
-    parser.add_argument('--img_size', type = int, default = 64, help = 'image size for training (assume square)')
+    parser.add_argument('--img_size', type = int, default = 56, help = 'image size for training (assume square)')
     args = parser.parse_args()
-    data_dir = args.data_dir
+    data_dir = Path(args.data_dir)
     data_name = os.path.basename(data_dir)
     data = (ImageTupleList.from_folders(data_dir, 'trainA', 'trainB')
                           .split_none()
