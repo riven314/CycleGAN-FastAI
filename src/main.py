@@ -15,7 +15,7 @@ from src.model_utils.loss import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type = str, help = 'dir to training data (contain trainA, trainB etc.)')
+    parser.add_argument('--data_dir', type = str, help = 'dir to training data (contain trainA, trainB, testA, testB)')
     parser.add_argument('--lr', type = float, default = 3e-4, help = 'learning rate')
     parser.add_argument('--bs', type = int, default = 64, help = 'batch size for training')
     parser.add_argument('--n_epoch', type = int, default = 100, help = 'no. epochs for training')

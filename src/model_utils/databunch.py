@@ -12,6 +12,9 @@ class ImageTuple(ItemBase):
         return self
     
     def to_one(self): return Image(0.5+torch.cat(self.data,2)/2)
+    
+    def __repr__(self):
+        return f'{self.__class__.__name__}{(self.img1.shape, self.img2.shape)}'
 
     
 class TargetTupleList(ItemList):
