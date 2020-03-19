@@ -44,6 +44,7 @@ class CycleGANTrainer(LearnerCallback):
         self.cyc_smter.add_value(self.loss_func.cyc_loss.detach().cpu())
     
     def on_batch_end(self, last_input, last_output, **kwargs):
+        #set_trace()
         self.G_A.zero_grad(); self.G_B.zero_grad()
         fake_A, fake_B = last_output[0].detach(), last_output[1].detach()
         real_A, real_B = last_input
