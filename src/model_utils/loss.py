@@ -15,6 +15,9 @@ class AdaptiveLoss(nn.Module):
     
 
 class CycleGanLoss(nn.Module):
+    """
+    this is for generator update, trigger right before on_backward_begin
+    """
     def __init__(self, cgan:nn.Module, lambda_A:float=10., lambda_B:float=10, lambda_idt:float=0.5, lsgan:bool=True):
         super().__init__()
         self.cgan,self.l_A,self.l_B,self.l_idt = cgan,lambda_A,lambda_B,lambda_idt

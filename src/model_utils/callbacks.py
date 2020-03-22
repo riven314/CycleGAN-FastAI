@@ -31,7 +31,9 @@ class CycleGANTrainer(LearnerCallback):
             self.opt_D_B = self.learn.opt.new([nn.Sequential(*flatten_model(self.D_B))])
         self.learn.opt.opt = self.opt_G.opt
         self._set_trainable()
+        # identity loss, gen loss, cycle loss (generator)
         self.id_smter,self.gen_smter,self.cyc_smter = SmoothenValue(0.98),SmoothenValue(0.98),SmoothenValue(0.98)
+        # discriminator A and B loss (discriminator)
         self.da_smter,self.db_smter = SmoothenValue(0.98),SmoothenValue(0.98)
         self.recorder.add_metric_names(['id_loss', 'gen_loss', 'cyc_loss', 'D_A_loss', 'D_B_loss'])
         
@@ -39,29 +41,37 @@ class CycleGANTrainer(LearnerCallback):
         self.learn.loss_func.set_input(last_input)
     
     def on_backward_begin(self, **kwargs):
+        # right after generator update
         self.id_smter.add_value(self.loss_func.id_loss.detach().cpu())
         self.gen_smter.add_value(self.loss_func.gen_loss.detach().cpu())
         self.cyc_smter.add_value(self.loss_func.cyc_loss.detach().cpu())
     
     def on_batch_end(self, last_input, last_output, **kwargs):
+        # for discriminators update
         #set_trace()
         self.G_A.zero_grad(); self.G_B.zero_grad()
         fake_A, fake_B = last_output[0].detach(), last_output[1].detach()
         real_A, real_B = last_input
+        # forward pass and backpropagate on discriminator A
         self._set_trainable(D_A=True)
         self.D_A.zero_grad()
         loss_D_A = 0.5 * (self.crit(self.D_A(real_A), True) + self.crit(self.D_A(fake_A), False))
         self.da_smter.add_value(loss_D_A.detach().cpu())
         loss_D_A.backward()
         self.opt_D_A.step()
+        # forward pass and backpropagate on discriminator B
         self._set_trainable(D_B=True)
         self.D_B.zero_grad()
         loss_D_B = 0.5 * (self.crit(self.D_B(real_B), True) + self.crit(self.D_B(fake_B), False))
         self.db_smter.add_value(loss_D_B.detach().cpu())
         loss_D_B.backward()
         self.opt_D_B.step()
+        # freeze discrimintors and unfreeze generators for generators update
         self._set_trainable()
         
     def on_epoch_end(self, last_metrics, **kwargs):
-        return add_metrics(last_metrics, [s.smooth for s in [self.id_smter,self.gen_smter,self.cyc_smter,
-                                                             self.da_smter,self.db_smter]])
+        # last_metrics is None
+        # add_metrics is for updating last_metrics
+        return add_metrics(last_metrics, 
+                           [s.smooth for s in [self.id_smter,self.gen_smter,self.cyc_smter, self.da_smter,self.db_smter]]
+                          )
