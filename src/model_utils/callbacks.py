@@ -2,9 +2,61 @@ from pdb import set_trace
 from fastai.vision import *
 from fastai.callbacks.tensorboard import LearnerTensorboardWriter, ImageTBWriter
 
+
+class CycleGANTensorboardWriter(LearnerTensorboardWriter):
+    
+    def _write_weight_histograms(self, iteration):
+        """ 
+        Writes model weight histograms to Tensorboard.
+        update self.hist_writer (HistogramTBWriter, inherented from LearnerTensorboardWriter)
+        """
+        G_A, G_B = self.learn.model.G_A, self.learn.model.G_B
+        D_A, D_B = self.learn.model.D_A, self.learn.model.D_B
+        self.hist_writer.write(model = G_A, iteration = iteration, 
+                               tbwriter = self.tbwriter, name = 'G_A_histogram')
+        self.hist_writer.write(model = G_B, iteration = iteration,
+                               tbwriter = self.tbwriter, name = 'G_B_histogram')
+        self.hist_writer.write(model = D_A, iteration = iteration, 
+                               tbwriter = self.tbwriter, name = 'D_A_histogram')
+        self.hist_writer.write(model = D_B, iteration = iteration,
+                               tbwriter = self.tbwriter, name = 'D_B_histogram')
+
+    def _write_gen_model_stats(self, iteration:int):
+        """ 
+        Writes gradient statistics for generator to Tensorboard.
+        update self.stats_writer (ModelStatsTBWriter)
+        """
+        G_A = self.learn.model.G_A
+        G_B = self.learn.model.G_B
+        self.stats_writer.write(model = G_A, iteration = iteration, 
+                                tbwriter = self.tbwriter, name = 'G_A_model_stats')
+        self.stats_writer.write(model = G_B, iteration = iteration,
+                                tbwriter = self.tbwriter, name = 'G_B_model_stats')
+        self.gen_stats_updated = True
+
+    def _write_critic_model_stats(self, iteration):
+        """
+        Writes gradient statistics for critic to Tensorboard.
+        update self.stats_writer (ModelStatsTBWriter)
+        """
+        D_A = self.learn.model.D_A
+        D_B = self.learn.model.D_B
+        self.stats_writer.write(model = D_A, iteration = iteration, 
+                                tbwriter = self.tbwriter, name = 'D_A_model_stats')
+        self.stats_writer.write(model = D_B, iteration = iteration,
+                                tbwriter = self.tbwriter, name = 'D_B_model_stats')
+        self.crit_stats_updated = True
+        
+    def _update_batches_if_needed(self):
+        """ 
+        overwrite original LearnerTensorboardWriter._update_batches_if_needed 
+        """
+        pass
+        
+        
 class CycleGANTrainer(CycleGANTensorboardWriter):
     _order = -20 #Need to run before the Recorder
-    
+    #log_dir = base_dir/name
     def __init__(self, learn, base_dir, name, loss_iters = 25, hist_iters = 500, stats_iters = 100):
         super().__init__(learn, base_dir, name, loss_iters, hist_iters, stats_iters)
         pass
@@ -26,7 +78,7 @@ class CycleGANTrainer(CycleGANTensorboardWriter):
             val = getattr(self, metric_name)
             tag = self.metrics_root + metric_name
             self.tbwriter.add_scalar(
-                tag = tag, scalar_value = scalar_value.detach().numpy(), global_step = iteration
+                tag = tag, scalar_value = val.smooth.numpy(), global_step = iteration
                 )
 
     def _write_critic_loss(self, iteration):
@@ -34,7 +86,7 @@ class CycleGANTrainer(CycleGANTensorboardWriter):
             val = getattr(self, metric_name)
             tag = self.metrics_root + metric_name
             self.tbwriter.add_scalar(
-                tag = tag, scalar_value = scalar_value.detach().numpy(), global_step = iteration
+                tag = tag, scalar_value = val.smooth.numpy(), global_step = iteration
                 )
     
     def on_train_begin(self, **kwargs):
@@ -61,14 +113,21 @@ class CycleGANTrainer(CycleGANTensorboardWriter):
     def on_batch_begin(self, last_input, **kwargs):
         self.learn.loss_func.set_input(last_input)
     
-    def on_backward_begin(self, iteration, **kwargs):
+    def on_backward_begin(self, **kwargs):
         # right after generator update
         self.id_smter.add_value(self.loss_func.id_loss.detach().cpu())
         self.gen_smter.add_value(self.loss_func.gen_loss.detach().cpu())
-        self.cyc_smter.add_value(self.loss_func.cyc_loss.detach().cpu())
-        if iteration self._write_generator_loss
+        self.cyc_smter.add_value(self.loss_func.cyc_loss.detach().cpu())        
+            
+    def on_backward_end(self, iteration, train, **kwargs):
+        if iteration == 0 or not train:
+            return None
+        if iteration % self.stats_iters == 0:
+            self._write_gen_model_stats(iteration)
+        if iteration % self.loss_iters == 0:
+            self._write_generator_loss(iteration)
     
-    def on_batch_end(self, last_input, last_output, **kwargs):
+    def on_batch_end(self, last_input, last_output, iteration, train, **kwargs):
         # for discriminators update
         #set_trace()
         self.G_A.zero_grad(); self.G_B.zero_grad()
@@ -91,57 +150,18 @@ class CycleGANTrainer(CycleGANTensorboardWriter):
         # freeze discrimintors and unfreeze generators for generators update
         self._set_trainable()
         
+        if iteration == 0 or not train:
+            return None
+        if iteration % self.stats_iters == 0:
+            self._write_critic_model_stats(iteration)
+        if iteration % self.loss_iters == 0:
+            self._write_critic_loss(iteration)
+        if iteration % self.hist_iters == 0:
+            self._write_weight_histograms(iteration)
+        
     def on_epoch_end(self, last_metrics, **kwargs):
         # last_metrics is None
         # add_metrics is for updating last_metrics
-        set_trace()
-        return add_metrics(last_metrics, 
-                           [s.smooth for s in [
-                               self.id_smter, self.gen_smter, self.cyc_smter, self.da_smter,self.db_smter
-                           ]]
-                          )
-
-
-class CycleGANTensorboardWriter(LearnerTensorboardWriter):
-    
-    def _write_weight_histograms(self, iteration):
-        """ 
-        Writes model weight histograms to Tensorboard.
-        update self.hist_writer (HistogramTBWriter, inherented from LearnerTensorboardWriter)
-        """
-        G_A, G_B = self.learn.model.G_A, self.learn.model.G_B
-        D_A, D_B = self.learn.model.D_A, self.learn.model.D_B
-        self.hist_writer.write(model = G_A, iteration = iteration, 
-                               tbwriter = self.tbwriter, name = 'G_A_histogram')
-        self.hist_writer.write(model = G_B, iteration = iteration,
-                               tbwriter = self.tbwriter, name = 'G_B_histogram')
-        self.hist_writer.write(model = D_A, iteration = iteration, 
-                               tbwriter = self.tbwriter, name = 'D_A_histogram')
-        self.hist_writer.write(model = D_B, iteration = iteration,
-                               tbwriter = self.tbwriter, name = 'D_B_histogram')
-
-    def _write_gen_model_stats(self, iteration:int):
-        """ 
-        Writes gradient statistics for generator to Tensorboard.
-        update self.stats_writer (ModelStatsTBWriter)
-        """
-        G_A = self.learn.G_A
-        G_B = self.learn.G_B
-        self.stats_writer.write(model = G_A, iteration = iteration, 
-                                tbwriter = self.tbwriter, name = 'G_A_model_stats')
-        self.stats_writer.write(model = G_B, iteration = iteration,
-                                tbwriter = self.tbwriter, name = 'G_B_model_stats')
-        self.gen_stats_updated = True
-
-    def _write_critic_model_stats(self, iteration):
-        """
-        Writes gradient statistics for critic to Tensorboard.
-        update self.stats_writer (ModelStatsTBWriter)
-        """
-        D_A = self.learn.D_A
-        D_B = self.learn.D_B
-        self.stats_writer.write(model = D_A, iteration = iteration, 
-                                tbwriter = self.tbwriter, name = 'D_A_model_stats')
-        self.stats_writer.write(model = D_B, iteration = iteration,
-                                tbwriter = self.tbwriter, name = 'D_B_model_stats')
-        self.crit_stats_updated = True 
+        return add_metrics(last_metrics, [
+                s.smooth for s in [self.id_smter, self.gen_smter, self.cyc_smter, self.da_smter,self.db_smter]
+        ])

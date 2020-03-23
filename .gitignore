@@ -1,6 +1,7 @@
 /horse2zebra
 /data/*
 !/data/test
+/data/test/*/*tfevents*
 /*/__pycache__
 /*/.ipynb_checkpoints
 /*/*/.ipynb_checkpoints
