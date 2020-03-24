@@ -28,6 +28,8 @@ if __name__ == '__main__':
     parser.add_argument('--loss_iters', type = int, default = 25, help = 'no. of iterations to update loss value in tensorboard')
     parser.add_argument('--hist_iters', type = int, default = 500, help = 'no. of iterations to update histogram value in tensorboard')
     parser.add_argument('--stats_iters', type = int, default = 360, help = 'no of iterations to update model gradients in tensorboard')
+    parser.add_argument('--critic_period', type = int, default = 1, help = 'period for discriminator update')
+    parser.add_argument('--warmup_iters', type = int, default = 0, help = 'before warm up iter no update on discriminator')
     args = parser.parse_args()
     data_dir = Path(args.data_dir)
     data_name = os.path.basename(data_dir)
@@ -43,7 +45,9 @@ if __name__ == '__main__':
                  base_dir = data_dir, name = args.exp_name,
                  loss_iters = args.loss_iters, 
                  hist_iters = args.hist_iters, 
-                 stats_iters = args.stats_iters)
+                 stats_iters = args.stats_iters,
+                 critic_period = args.critic_period,
+                 warmup_iters = args.warmup_iters)
     learn = Learner(data, cycle_gan, 
                     loss_func = CycleGanLoss(cycle_gan), 
                     opt_func = partial(optim.Adam, betas = (0.5, 0.99)),

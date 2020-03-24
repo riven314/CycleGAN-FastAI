@@ -34,6 +34,7 @@ class CycleGanLoss(nn.Module):
         #Generators should return identity on the datasets they try to convert to
         self.id_loss = self.l_idt * (self.l_A * F.l1_loss(idt_A, self.real_A) + self.l_B * F.l1_loss(idt_B, self.real_B))
         #Generators are trained to trick the discriminators so the following should be ones
+        # D_A(fake_A) --> (BN, 1, 4, 4)
         self.gen_loss = self.crit(self.cgan.D_A(fake_A), True) + self.crit(self.cgan.D_B(fake_B), True)
         #Cycle loss
         self.cyc_loss  = self.l_A * F.l1_loss(self.cgan.G_A(fake_B), self.real_A)

@@ -57,9 +57,10 @@ class CycleGANTensorboardWriter(LearnerTensorboardWriter):
 class CycleGANTrainer(CycleGANTensorboardWriter):
     _order = -20 #Need to run before the Recorder
     #log_dir = base_dir/name
-    def __init__(self, learn, base_dir, name, loss_iters = 25, hist_iters = 500, stats_iters = 100):
+    def __init__(self, learn, base_dir, name, loss_iters = 25, hist_iters = 500, stats_iters = 100, critic_period = 1, warmup_iters = 0):
         super().__init__(learn, base_dir, name, loss_iters, hist_iters, stats_iters)
-        pass
+        self.critic_period = critic_period
+        self.warmup_iters = warmup_iters
     
     def _set_trainable(self, D_A=False, D_B=False):
         gen = (not D_A) and (not D_B)
@@ -120,6 +121,7 @@ class CycleGANTrainer(CycleGANTensorboardWriter):
         self.cyc_smter.add_value(self.loss_func.cyc_loss.detach().cpu())        
             
     def on_backward_end(self, iteration, train, **kwargs):
+        """ bookmark generator weight gradients """
         if iteration == 0 or not train:
             return None
         if iteration % self.stats_iters == 0:
@@ -133,20 +135,31 @@ class CycleGANTrainer(CycleGANTensorboardWriter):
         self.G_A.zero_grad(); self.G_B.zero_grad()
         fake_A, fake_B = last_output[0].detach(), last_output[1].detach()
         real_A, real_B = last_input
+        
+        if (iteration % self.critic_period == 0) and iteration >= self.warmup_iters: 
+            self._set_trainable(D_A = True)
+        
         # forward pass and backpropagate on discriminator A
-        self._set_trainable(D_A=True)
         self.D_A.zero_grad()
         loss_D_A = 0.5 * (self.crit(self.D_A(real_A), True) + self.crit(self.D_A(fake_A), False))
         self.da_smter.add_value(loss_D_A.detach().cpu())
-        loss_D_A.backward()
-        self.opt_D_A.step()
+        
+        if (iteration % self.critic_period == 0) and iteration >= self.warmup_iters: 
+            loss_D_A.backward()
+            self.opt_D_A.step()
+
         # forward pass and backpropagate on discriminator B
-        self._set_trainable(D_B=True)
+        if (iteration % self.critic_period == 0) and iteration >= self.warmup_iters: 
+            self._set_trainable(D_B = True)
+
         self.D_B.zero_grad()
         loss_D_B = 0.5 * (self.crit(self.D_B(real_B), True) + self.crit(self.D_B(fake_B), False))
         self.db_smter.add_value(loss_D_B.detach().cpu())
-        loss_D_B.backward()
-        self.opt_D_B.step()
+
+        if (iteration % self.critic_period == 0) and iteration >= self.warmup_iters: 
+            loss_D_B.backward()
+            self.opt_D_B.step()
+        
         # freeze discrimintors and unfreeze generators for generators update
         self._set_trainable()
         
