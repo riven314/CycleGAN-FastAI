@@ -55,6 +55,6 @@ if __name__ == '__main__':
     else:
         learn.fit(args.n_epoch, args.lr)
         suffix = 'wocycle'
-    learn.save(f'{data_name}_{suffix}_{args.exp_name}_{args.n_epcoh}fit')
+    learn.save(f'{data_name}_{suffix}_{args.exp_name}_{args.n_epoch}fit')
     end = time.time()
     print(f'training complete: {(end - start) / 60} mins')
