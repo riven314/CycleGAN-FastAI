@@ -1,15 +1,11 @@
 ### CycleGAN on Simulated Multi-digit MNIST Data
-As a proof-of-concept, test if CycleGAN can learn spatial variation from images with multi-digit MNIST
+As a proof-of-concept, test if CycleGAN can learn spatial variation from images with multi-digit MNIST. I use fastai framework for this project. By the time I am doing this project, I attended lesson 10 of Deep Learning for Coders part 2. This project also serve to practice writing custom callbacks and applying tensorboards in fastai framework. 
 
+### Dataset
+MNIST digits with affine transformation. One set of data have one digit per image, another set of data have two digits per image.
 
-### Procedures
-1. prepare two sets of data (domain X and Y) with multi-digit MNIST simulator. They are different in spatial semantics 
-2. train CycleGAN on the two sets of data. Experiment if CycleGAN can learn to translate between domain X and Y
-
-
-### Remarks
-1. prepare several sets of domain X and Y, with varying difficulties
-
+## Experiment
+I did several experiments. I tried training with flat learning rate as a baseline, and compared its performance against one cycle policy. Though the model trained with one cycle policy have a lower loss. Both models suffer from mode collapse. 
 
 ### Reference
 1. [github] multi-digit MNIST simulator: https://github.com/shaohua0116/MultiDigitMNIST
